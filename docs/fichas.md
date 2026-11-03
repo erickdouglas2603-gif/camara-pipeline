@@ -90,19 +90,103 @@
   - o refined leva os 7.889 ou só quem tem idLegislaturaFinal >= 57?
   - cpf é necessário para ligar com as despesas?
 
-  ### Ano-2025
-- Fonte e data: dadosabertos.camara.leg.br/arquivos/deputados/csv//Ano-2025.csv, baixado em 31/10/2026
--- Formato: utf-8 / separador ";" (diferente dos outros 6 arquivos)
-    -valores lidos como DOUBLE; no refined, DECIMAL (dinheiro não fica em ponto flutuante)
+  ### Ano-2025 (despesas da cota — CEAP)
+- Fonte e data: camara.leg.br/cotas/Ano-2025.csv.zip, baixado em 31/10/2026
+  - dicionário: dadosabertos.camara.leg.br/howtouse/2023-12-26-dados-ceap.html
+- Formato: utf-8 / separador ";" (diferente dos outros 6) / aspas " / decimal: ponto
 - Linhas: 209.081
-- - Grão: um lançamento na cota (valor × documento × categoria × data)
-- Chave: NÃO existe chave natural
-  - ideDocumento repete: 10.318 documentos com 2 a 6 linhas (99,2% passagem aérea: remarcação/compensação)
-  - 21 documentos aparecem em 2 categorias (nota com itens de rubricas diferentes); todos de 1 deputado só
-  - ideDocumento = 0 → falso nulo: 7.841 linhas, 100% TELEFONIA contratada pela Câmara, sem data de emissão
-  - 1 linha com ideDocumento nulo: Arthur Lira, PASSAGEM AÉREA - MISSÃO OFICIAL, vlrDocumento +61.932,80 e vlrLiquido −61.932,80
-  - nenhuma cópia exata (209.081 = 209.081)
-  - conferência: as partes somam o todo (189.081 docs + doc 0 + 1 nulo; 201.239 + 7.841 + 1 = 209.081 linhas)
-- Pergunta em aberto: criar chave substituta no refined? (hash ou sequencial)
-- Regra pra marts: contagem de documentos NÃO soma entre categorias; documento 0 fica fora de qualquer contagem de documentos
-- Valores estranhos: soma em DOUBLE deu 822726.939999997 → DECIMAL no refined
+- Organização do arquivo: por ano de COMPETÊNCIA (numAno sempre 2025);
+  notas emitidas de 18/02/2024 a 31/03/2026
+- Grão: um lançamento na cota (valor × documento × categoria × competência)
+- Chave: NÃO existe chave natural → [decidir] chave substituta no refined
+  - ideDocumento repete: 10.318 docs com 2 a 6 linhas (99,2% PASSAGEM AÉREA)
+  - 21 docs em 2 categorias (nota com itens de rubricas diferentes), todos de 1 deputado
+  - ideDocumento = 0 → falso nulo: 7.841 linhas, 100% TELEFONIA da Câmara
+  - 1 linha com ideDocumento nulo (Arthur Lira, MISSÃO OFICIAL, +61.932,80 / −61.932,80)
+  - nenhuma cópia exata; conferência 201.239 + 7.841 + 1 = 209.081 ✓
+- Liga com:
+  - deputados por ideCadastro (N:1): 0 órfãos (NOT EXISTS)
+  - ideCadastro ↔ nuDeputadoId: 1 para 1 (562) → nuDeputadoId redundante p/ pessoas
+  - votos: 549 nos dois · 13 só gastaram · 2 só votaram → FULL JOIN ou partir do cadastro
+- Beneficiário que não é pessoa: 937 linhas sem ideCadastro = 12 lideranças, ~R$ 1,14 mi, sgUF='NA'
+- Atributos que mudam: sgPartido = última filiação NO ANO, não a da data da despesa
+- Valores:
+  - O GASTO = vlrLiquido (o que sai da cota). Total 2025: R$ 240.347.478,45
+  - DOUBLE gera falso erro: "líquido ≠ documento − glosa" dá 2.548 em DOUBLE, 279 em DECIMAL
+    → no refined, DECIMAL
+  - vlrGlosa nula em 835 linhas (= as 835 com documento positivo e líquido negativo)
+  - não fecham, já com coalesce e DECIMAL: 1.114 = 279 + 835
+  - negativos: 7.197 em vlrDocumento (compensação de passagem); 8.032 em vlrLiquido
+    → negativos ENTRAM na soma (são devolução/compensação)
+  - restituição: 51 linhas, R$ 180.356,68; todas com vlrLiquido = 0
+- Datas:
+  - mês do gasto = numMes/numAno (competência; sempre preenchido)
+  - datEmissao nula em 8.675 = 7.841 telefonia + 834 auxílio-moradia
+  - 17.230 linhas com mês da nota ≠ mês da competência
+- Categorias: 21 códigos (numSubCota), cada um com 1 descrição
+  - top 3: DIVULGAÇÃO (R$ 102 mi, 42%), LOCAÇÃO DE VEÍCULOS (R$ 41,9 mi), ESCRITÓRIO (R$ 33,5 mi)
+  - 4 categorias de passagem aérea: SIGEPA, REEMBOLSO, RPA, MISSÃO OFICIAL
+  - COMPLEMENTAÇÃO DO AUXÍLIO-MORADIA: total NEGATIVO (−R$ 1,8 mi), 834 linhas sem emissão
+  - indTipoDocumento 4 e 5 = NF-e (dicionário) → unificar no refined
+- Fornecedores:
+  - 0 sem CNPJ/CPF; 0 CNPJs falsos (00.000.000/0000-0X) em 2025
+  - [pendente] contradição: tamanho estranho = 0, mas LIMIT mostrou CNPJ de 13 dígitos
+  - texto livre: txtTrecho com variação ("BSB /CGH" × "BSB/CGH")
+- Dado pessoal:
+  - cpf do deputado preenchido em 208.144 linhas (todas exceto lideranças) → NÃO vai pro refined
+    (ideCadastro já liga; dado pessoal sem necessidade)
+  - txtPassageiro em 37.770 linhas: nome de terceiros → NÃO vai pros marts
+- Falsos nulos: ideDocumento = 0 · sgUF = 'NA' · vlrGlosa nula
+- Perguntas em aberto:
+  - chave substituta: hash das colunas ou sequencial?
+  - lideranças: coluna tipo_beneficiario ou fora dos marts por deputado?
+  - auxílio-moradia negativo: é desconto/ajuste? fica nos totais?
+  - ausência de despesa ≠ não gastou (lançamento atrasado; mandato curto)
+  - [pendente] os 13 que gastaram sem votar
+- Fornecedores:
+  - txtCNPJCPF com pontuação inconsistente (ex.: 085.324.290/0013-1, 14 dígitos, mal formatado)
+    → no refined: só dígitos; 0 com tamanho fora de 11 (CPF) ou 14 (CNPJ)
+- Os 13 que gastaram sem votar: quase todos só jan–fev (1ª votação nominal: 11/02)
+  → suplentes que saíram no início do ano + licenciados (resíduos de centavos, provável ramal)
+- sgPartido tem 'S.PART.' (sem partido) → valor de domínio, não é partido
+
+### proposicoes-2025
+- Linhas: 107.587 · Grão: uma proposição (inclui emendas, pareceres, requerimentos: 82 tipos)
+- Chave: id — provada (107.587 = 107.587)
+  - (siglaTipo, numero, ano) NÃO é chave: 36.099 combinações → nunca ligar pelo "nome"
+- Datas: dataApresentacao de 17/03/2003 a 16/09/2026; 59.259 (55%) com ano ≠ 2025
+  - [investigar] por que um arquivo "2025" tem proposições de outros anos
+- ultimoStatus_* = estado ATUAL da tramitação (retrato do dia do download, muda todo dia)
+- Nulos: 2.723 sem ementa
+- Liga com:
+  - votacoes por ultimaApresentacaoProposicao_idProposicao (desconsiderando o 0):
+    5.264 citadas, 544 (10%) fora do arquivo → LEFT JOIN, ou ingerir vários anos
+  - proposicoesAutores por id = idProposicao (1:N)
+- Perguntas em aberto: recorte de anos das proposições; o que o "ano" do arquivo significa
+
+### proposicoesAutores-2025
+- Linhas: 154.579 · Grão: um signatário de uma proposição
+- Chave: (idProposicao, ordemAssinatura) — provada (154.579 = 154.579)
+  - (idProposicao, idDeputadoAutor) NÃO é chave: 153.230 (autores não deputados têm id nulo)
+- Autor não é sempre deputado: 15.162 linhas (~10%) sem idDeputadoAutor
+  - 24 tipos de autor: Deputado(a), Senador(a), Executivo, comissões, Judiciário, MPU, DPU, Sociedade Civil...
+- proponente: 0 | 1 (só o 1º signatário escreve a justificativa — dicionário, art. 102)
+- siglaPartidoAutor = partido NO MOMENTO da assinatura
+- Liga com:
+  - proposicoes: 107.637 proposições aqui × 107.587 lá → 56 linhas de autoria sem proposição
+  - deputados por idDeputadoAutor: 0 órfãos
+- Pergunta em aberto: "autoria" no mart conta todo signatário ou só o proponente?
+
+### votacoesOrientacoes-2025
+- Linhas: 4.947 · Grão: a orientação de uma bancada numa votação
+- Chave: (idVotacao, siglaBancada) — provada (4.947 = 4.947)
+- 540 votações; 31 bancadas (partidos + blocos + Governo/Maioria/Minoria/Oposição)
+- Órgãos: 13 (PLEN + comissões) → CONTRADIZ o dicionário ("só Plenário")
+- Domínio: Sim | Não | Liberado | Obstrução | nulo (1.205 linhas, 24%)
+  - [investigar] o que é orientação nula: bancada não orientou?
+- Liga com:
+  - votacoes: 0 votações inexistentes
+  - votos: todas as 540 têm voto nominal; mas há 550 votações nominais
+    → 10 votações nominais SEM orientação
+- Habilita o indicador: "o deputado seguiu a orientação da bancada?"
+  (cuidado: siglaBancada pode ser bloco, não partido → casar com o partido do voto exige regra)

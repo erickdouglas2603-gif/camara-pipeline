@@ -6,7 +6,7 @@ Formato: indicador — tabelas (colunas) — o que mede. `?` = depende de decis�
 
 ## Atividade parlamentar
 
-1. Participação em votações nominais — votacoesVotos (idVotacao, deputado_id) + deputados (uri, nome) — votos registrados sobre as 550 votações nominais do ano; ? suplentes ficam com taxa baixa por mandato curto (o cadastro não tem datas de exercício)
+1. Presença em eventos realizados — eventosPresencaDeputados (idEvento, idDeputado) + eventos (id, situacao) + deputados (nome) — nº de eventos encerrados com presença registrada, por deputado; cancelados fora (116 presenças); ? é contagem, não taxa: o denominador exige saber de que órgãos o deputado é membro
 
 2. Fidelidade à orientação da bancada — votacoesVotos (idVotacao, deputado_id, voto, deputado_siglaPartido) + votacoesOrientacoes (idVotacao, siglaBancada, orientacao) — % de votos iguais à orientação da bancada do deputado; ? siglaBancada pode ser bloco, não partido: exige regra de casamento; "Liberado" e orientação nula ficam fora
 
@@ -14,7 +14,7 @@ Formato: indicador — tabelas (colunas) — o que mede. `?` = depende de decis�
 
 4. Votações apertadas — votacoes (id, votosSim, votosNao, aprovacao, siglaOrgao) — diferença entre Sim e Não nas votações nominais; quantas foram decididas por menos de 5% dos votos
 
-5. Proposições apresentadas como proponente — proposicoesAutores (idProposicao, idDeputadoAutor, proponente = 1) + proposicoes (id, siglaTipo) + deputados (nome) — conta só o primeiro signatário; ? decidir se emendas e requerimentos entram (82 tipos)
+5. Proposições por tema e por proponente — proposicoesAutores (idProposicao, idDeputadoAutor, proponente = 1) + proposicoesTemas (uriProposicao, codTema, tema) + proposicoes (id) — temas das proposições que cada deputado apresentou; cobre só as 18% classificadas; proposição conta em cada tema (não soma)
 
 ## Cota parlamentar
 
