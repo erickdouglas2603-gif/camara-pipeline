@@ -1,4 +1,5 @@
 .venv/
 *.duckdb
 explorar/
-raw/
+raw/__pycache__/
+*.pyc
