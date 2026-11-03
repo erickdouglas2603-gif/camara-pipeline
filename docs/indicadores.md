@@ -1,8 +1,7 @@
 # Indicadores — Câmara dos Deputados, 2025
 
-Recorte: ano de 2025 (votações, votos e orientações por data da votação;
+Recorte: ano de 2025 (votações, votos, orientações e eventos por data;
 despesas por competência; proposições conforme o arquivo do ano).
-Formato: indicador — tabelas (colunas) — o que mede. `?` = depende de decisão em aberto.
 
 ## Atividade parlamentar
 
@@ -28,6 +27,7 @@ Formato: indicador — tabelas (colunas) — o que mede. `?` = depende de decis�
 
 10. Concentração de fornecedores — Ano-2025 (txtCNPJCPF só dígitos, txtFornecedor, vlrLiquido) — quantos fornecedores somam 80% do gasto (Pareto); CNPJ normalizado para não contar o mesmo fornecedor duas vezes
 
+11. Participação em votações nominais — votacoesVotos (idVotacao, deputado_id) + deputados (nome) — votos registrados sobre as 550 votações nominais do ano; mede voto, não presença (ver 1); ? suplentes ficam com taxa baixa por mandato curto
 ## Indicadores que o dado NÃO sustenta
 
 - ❌ "Gasto por projeto aprovado" (eficiência do deputado) — a cota paga escritório, combustível
@@ -36,7 +36,15 @@ Formato: indicador — tabelas (colunas) — o que mede. `?` = depende de decis�
   não tem regra. Mostrar gasto (6) e proposições (5) lado a lado, sem dividir.
 - ❌ "Gasto por partido no momento da despesa" — no Ano-2025, sgPartido é a última filiação
   do ano (dicionário), não a da data da despesa.
-- ❌ "Taxa de faltas" — ausente não tem linha em votacoesVotos; só dá para contar
+- ❌ "Taxa de faltas" — ausente não tem linha em votacoesVotos nem em eventosPresencaDeputados;
+  só dá para contar presença e participação, não ausência (justificada ou não).
   participação, não ausência justificada ou não.
 - ❌ "Como cada deputado votou na eleição do CNJ" — votação secreta (2576389-4):
   o voto individual é nulo por regra.
+
+  ## Próximos passos (fontes que destravariam mais indicadores)
+
+- eventosOrgaos + orgaosDeputados (Câmara): taxa de presença com denominador real (membros de cada órgão)
+- IBGE, população por UF: gasto da cota per capita por estado
+- Receita Federal, base de CNPJ: data de abertura e atividade do fornecedor
+- TSE, prestação de contas: gasto de campanha × gasto de cota
