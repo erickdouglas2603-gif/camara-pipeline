@@ -10,7 +10,8 @@ Gerar o schema `marts` no `camara.duckdb`: um `.sql` por indicador, prontos para
 2. **Nomes das tabelas**: `dim_<Assunto>` para dimensão e `agg_<Assunto>_<Detalhe>` para indicador.
    Campos com o mesmo padrão de prefixos do refined (`id_`, `cod_`, `des_`, `qtd_`, `vlr_`, `pct_`, `bln_`...).
    Novo prefixo: `pct_` para percentual, guardado de 0 a 100 com 1 casa (`DECIMAL(5,1)`).
-3. **Dinheiro** continua `DECIMAL`: nunca dividir em DOUBLE. Média de dinheiro: `DECIMAL(14,2)`.
+3. **Dinheiro** continua `DECIMAL`: nunca guardar nem somar dinheiro em DOUBLE; divisão com CAST para DECIMAL
+   na mesma expressão (no DuckDB, `DECIMAL / x` devolve DOUBLE). Média de dinheiro: `DECIMAL(14,2)`.
 4. **Divisão por zero** vira NULL (`NULLIF(denominador, 0)`), nunca erro e nunca zero.
 5. **Grupo pequeno não vira indicador**: onde há corte de amostra, a linha continua no mart com o valor NULL
    e `bln_amostra_suficiente = FALSE`. O leitor vê que o grupo existe e por que está sem valor.
@@ -27,6 +28,9 @@ carregado pelo `pipeline/transformacao.py` antes das tabelas que dependem dele.
   (`id_votacao`, `cod_partido`) não repete (0 colisões) · JOIN casa 3.283 orientações.
 
 ## Organização do código
+- O nome da tabela não sai do nome do arquivo (`00_dim_deputado.sql` → `dim_Deputado`): `pipeline/marts.py` tem uma lista
+  explícita (arquivo, tabela, chave). Verifica que a ordem da lista segue a numeração dos arquivos e que nenhum `.sql`
+  de `sql/marts/` ficou fora dela.
 - `sql/marts/<nn>_<nome>.sql`; `pipeline/marts.py` executa `CREATE OR REPLACE TABLE marts.<tabela> AS <select>`
   numa transação, em ordem numérica (a `dim_Deputado`, arquivo `00`, vem primeiro), roda as conferências
   e segue o mesmo padrão do `transformacao.py`: banco ausente ou travado → avisa e sai; falha → ROLLBACK,
@@ -35,10 +39,16 @@ carregado pelo `pipeline/transformacao.py` antes das tabelas que dependem dele.
 
 ## Números a medir antes de codar
 Assim como no 690 da spec 02: medir na base, escrever aqui e só depois codar.
-- [ ] Deputados no universo de 2025 (`dim_Deputado.bln_universo_2025 = TRUE`)
-- [ ] Votações apertadas (M04)
-- [ ] Fornecedores que somam 80% do gasto (M10)
-- [ ] Votos orientados pelo Governo dentro das regras (M12)
+Medido no retrato de 03/11/2026 15:49 (raw/refined no `camara.duckdb`).
+- [x] Deputados no universo de 2025 (`dim_Deputado.bln_universo_2025 = TRUE`): **564**
+  (573 dos 690 exerceram em 2025; 9 deles são de fora da 57).
+- [x] Votações apertadas (M04): **7** das 550 (3 do PLEN). Nenhuma margem entre 4,95 e 5: arredondar
+  `pct_margem` para 1 casa antes do corte não muda o número.
+- [x] Fornecedores que somam 80% do gasto (M10): **1.452** de 19.663 chaves (raiz/CNPJ fictício/nome PF),
+  incluindo o que cruza a linha.
+- [x] Votos orientados pelo Governo dentro das regras (M12): **129.694** (86.259 alinhados), somando os
+  deputados do universo. Sem o filtro de universo dá o mesmo número; nenhum voto secreto (NULL) cai em
+  votação com orientação do Governo.
 
 ---
 
@@ -66,7 +76,8 @@ Grão: um deputado do universo de 2025.
 | qtd_eventos_presente | eventos distintos com presença, com `bln_realizado` e `des_tipo_evento <> 'Teste do Painel Eletrônico'` |
 
 - Parte da dimensão com LEFT JOIN: deputado sem presença aparece com 0, não some.
-- Todos os tipos de evento contam igual, exceto o teste do painel (26 eventos): é teste de equipamento, como o TESTECOM.
+- Todos os tipos de evento contam igual, exceto o teste do painel (73 eventos do tipo, 69 realizados, 26 com presença):
+  é teste de equipamento, como o TESTECOM.
 - É contagem, não taxa: o denominador exigiria saber de que órgãos o deputado é membro (limitação no README).
 
 ## M02 · `marts.agg_Fidelidade_Partido` — `02_fidelidade_partido.sql`
@@ -113,16 +124,19 @@ Grão: uma votação nominal (550): placar `qtd_votos_sim + qtd_votos_nao + qtd_
 | id_votacao, data_votacao, cod_orgao, qtd_votos_sim, qtd_votos_nao, qtd_votos_outros, bln_aprovada | do refined |
 | pct_margem | `abs(sim − não) / (sim + não)`; NULL se sim + não = 0 |
 | bln_apertada | `pct_margem < 5` |
-| bln_resultado_contra_placar | `(bln_aprovada AND NOT sim > não) OR (NOT bln_aprovada AND sim > não)`; NULL se `bln_aprovada` é NULL |
+| bln_resultado_contra_placar | `(bln_aprovada AND não > sim) OR (NOT bln_aprovada AND sim > não)`; NULL se `bln_aprovada` é NULL; empate é FALSE (quem decide é o desempate) |
 
 - Todos os órgãos entram. A margem é proporcional, então numa comissão de 10 votos só o empate é apertado.
-- Achado: 2 votações com mais Sim foram rejeitadas (quórum qualificado) e 3 com mais Não foram aprovadas.
+- Achado: 2 votações com mais Sim foram rejeitadas (quórum qualificado) e 2 com mais Não foram aprovadas.
+  Os 2 empates (um aprovado, 2220819-82 na CE com 17 × 17, e um rejeitado) não contam.
   A flag deixa o dashboard mostrar isso sem calcular.
 
 ## M05 · `marts.agg_Proposicao_Tema_Deputado` — `05_proposicao_tema_deputado.sql`
 Grão: deputado × tema × tipo de proposição.
 
-Recorte: proposições **apresentadas em 2025** (`num_ano = 2025`), autor deputado (`id_deputado` não NULL) e proponente (`bln_proponente`).
+Recorte: proposições **apresentadas em 2025** (`num_ano = 2025`), autor deputado (`id_deputado` não NULL) e proponente (`bln_proponente`),
+e autor no universo de 2025 (JOIN com `dim_Deputado` onde `bln_universo_2025`). Sem esse JOIN entrariam 31 ex-deputados
+hoje em outra casa (391 proposições de 2025, 3 deles com tema): autoria de senador não é produção de deputado de 2025.
 | campo | regra |
 |---|---|
 | id_deputado, des_nome | |
@@ -246,18 +260,19 @@ ficam fora `Liberado`, NULL e voto `Artigo 17`; alinhado = voto igual à orienta
 Mesmo padrão da spec 02: números fixos do retrato, cada verificação atômica conta 1.
 
 1. Cada mart tem chave (o grão) sem repetição e sem NULL.
-2. Contagens: `dim_Deputado` 690 · M02 20 · M04 550 (429 do PLEN) · M07 21 · M08 12 · M09 27 ·
-   M01, M06, M11, M12 = universo de 2025 (número a medir).
+2. Contagens: `dim_Deputado` 690 · M02 20 · M04 550 (429 do PLEN) · M05 15.223 · M07 21 · M08 12 · M09 27 ·
+   M01, M06, M11, M12 = universo de 2025 (564).
 3. Somas que têm que bater com o refined:
    M06 `sum(vlr_total)` = 239.208.957,97 (total − lideranças) · M07 = M08 = M10 = 240.347.478,45 · M09 = 239.208.957,97.
 4. M02: `sum(qtd_votos)` = 175.067 · `sum(qtd_votos_orientados)` = 32.179 · `sum(qtd_votos_fieis)` = 30.770 ·
    `bln_amostra_suficiente` TRUE = 9.
 5. M03: soma de `qtd_votacoes` = 8.212 (grupos com 3 ou mais deputados).
-6. M04: `bln_resultado_contra_placar` TRUE = 5.
+6. M04: `bln_resultado_contra_placar` TRUE = 4 · `bln_apertada` TRUE = 7.
 7. M07: `sum(pct_total)` entre 99,9 e 100,1 (arredondamento).
-8. M10: último `pct_acumulado` = 100,0 · `bln_cnpj_ficticio` TRUE = 5 chaves.
+8. M10: último `pct_acumulado` = 100,0 · `bln_cnpj_ficticio` TRUE = 5 chaves · `bln_top_80` TRUE = 1.452.
 9. M11: `pct_participacao` entre 0 e 100 · `qtd_votos_registrados <= qtd_votacoes_no_periodo`.
-10. Nenhum mart por deputado tem `id_deputado` fora do universo de 2025.
+10. Nenhum mart por deputado (M01, M05, M06, M11, M12) tem `id_deputado` fora do universo de 2025.
+11. M12: `sum(qtd_votos_orientados)` = 129.694 · `sum(qtd_votos_alinhados)` = 86.259.
 
 ## Decisões registradas
 | # | Decisão | Alternativa descartada |
