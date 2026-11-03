@@ -1,10 +1,10 @@
 ### votacoesVotos-2025
 - Fonte e data: dadosabertos.camara.leg.br/arquivos/votacoesVotos, baixado em 31/10/2026
-- Formato: utf-8 / separador simples / cabeçalho na 1ª linha
+- Formato: utf-8 / ; / cabeçalho na 1ª linha
 - Linhas: 175.067
 - Grão: o voto de um deputado numa votação
 - Chave: (idVotacao, deputado_id) — provada, linhas = chaves
-- Cópias exatas: não testado ainda
+- Cópias exatas: não testado ainda por nenhuma (decorre da chave única)
 - Liga com: votacoes por idVotacao; deputados por deputado_id
 - Nulos que significam algo: 421 em `voto`, todos da votação 2576389-4 (secreta, eleição CNJ): votou, voto sigiloso
 - Categorias: Sim 101.406 · Não 72.098 · Artigo 17 420 (presidente da Câmara) · Obstrução 375 · Abstenção 347
@@ -19,7 +19,7 @@
   ### votacoes-2025
 
 - Fonte e data: dadosabertos.camara.leg.br/arquivos/votacoes/csv/votacoes-2025.csv, baixado em 31/10/2026
-- Formato: utf-8 / separador simples / cabeçalho na 1ª linha
+- Formato: utf-8 / ; / cabeçalho na 1ª linha
 - Linhas: 13.827
 - Grão: uma votação, de qualquer órgão (Plenário ou comissão), nominal ou simbólica
 - Chave: id — provada (13.827 linhas = 13.827 distintos)
@@ -54,11 +54,11 @@
   - nenhum registro antes da votação
   - → o mês da votação é o de `data`
 
- ### Deputados-2025
+
 
 ### deputados
 - Fonte e data: dadosabertos.camara.leg.br/arquivos/deputados/csv/deputados.csv, baixado em 31/10/2026
-- Formato: utf-8 / separador simples / cabeçalho na 1ª linha
+- Formato: utf-8 / ; / cabeçalho na 1ª linha
 - Linhas: 7.889
 - Grão: uma pessoa que já exerceu mandato de deputado, de toda a história da Câmara
   - legislaturas de 1 a 57 (consulta 2)
@@ -93,7 +93,7 @@
   ### Ano-2025 (despesas da cota — CEAP)
 - Fonte e data: camara.leg.br/cotas/Ano-2025.csv.zip, baixado em 31/10/2026
   - dicionário: dadosabertos.camara.leg.br/howtouse/2023-12-26-dados-ceap.html
-- Formato: utf-8 / separador ";" (diferente dos outros 6) / aspas " / decimal: ponto
+- Formato: utf-8 / separador `;` (diferente dos outros 6) / aspas " / decimal: ponto
 - Linhas: 209.081
 - Organização do arquivo: por ano de COMPETÊNCIA (numAno sempre 2025);
   notas emitidas de 18/02/2024 a 31/03/2026
@@ -149,6 +149,7 @@
 - Os 13 que gastaram sem votar: quase todos só jan–fev (1ª votação nominal: 11/02)
   → suplentes que saíram no início do ano + licenciados (resíduos de centavos, provável ramal)
 - sgPartido tem 'S.PART.' (sem partido) → valor de domínio, não é partido
+- Cópias exatas: 0 (DISTINCT * = 209.081).
 
 ### proposicoes-2025
 - Linhas: 107.587 · Grão: uma proposição (inclui emendas, pareceres, requerimentos: 82 tipos)
@@ -232,6 +233,3 @@
 - Categorias: 32 temas; até 12 temas por proposição; relevancia = 0 | 1 | 2
 - Atenção: proposição com vários temas conta uma vez em cada tema → a soma por tema é maior que o total de proposições
 
-### Correções nas fichas existentes
-- votacoesVotos, votacoes, deputados: "separador simples" → "separador `;`"
-- Ano-2025 (cota): remover "diferente dos outros"; "Cópias exatas: 0 (DISTINCT * = 209.081)"
