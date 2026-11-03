@@ -5,7 +5,7 @@ despesas por competência; proposições conforme o arquivo do ano).
 
 ## Atividade parlamentar
 
-1. Presença em eventos realizados — eventosPresencaDeputados (idEvento, idDeputado) + eventos (id, situacao) + deputados (nome) — nº de eventos encerrados com presença registrada, por deputado; cancelados fora (116 presenças); ? é contagem, não taxa: o denominador exige saber de que órgãos o deputado é membro
+1. Presença em eventos realizados — eventosPresencaDeputados (idEvento, idDeputado) + eventos (id, situacao) + deputados (nome) — nº de eventos encerrados com presença registrada, por dgit add .eputado; cancelados fora (116 presenças); ? é contagem, não taxa: o denominador exige saber de que órgãos o deputado é membro
 
 2. Fidelidade à orientação da bancada — votacoesVotos (idVotacao, deputado_id, voto, deputado_siglaPartido) + votacoesOrientacoes (idVotacao, siglaBancada, orientacao) — % de votos iguais à orientação da bancada do deputado; ? siglaBancada pode ser bloco, não partido: exige regra de casamento; "Liberado" e orientação nula ficam fora
 
