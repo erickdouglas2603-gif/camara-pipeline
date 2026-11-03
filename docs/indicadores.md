@@ -5,7 +5,7 @@ despesas por competência; proposições conforme o arquivo do ano).
 
 ## Atividade parlamentar
 
-1. Presença em eventos realizados — eventosPresencaDeputados (idEvento, idDeputado) + eventos (id, situacao) + deputados (nome) — nº de eventos encerrados com presença registrada, por dgit add .eputado; cancelados fora (116 presenças); ? é contagem, não taxa: o denominador exige saber de que órgãos o deputado é membro
+1. Presença em eventos realizados — eventosPresencaDeputados (idEvento, idDeputado) + eventos (id, situacao) + deputados (nome) — nº de eventos encerrados com presença registrada, por deputado; cancelados fora (116 presenças); ? é contagem, não taxa: o denominador exige saber de que órgãos o deputado é membro
 
 2. Fidelidade à orientação da bancada — votacoesVotos (idVotacao, deputado_id, voto, deputado_siglaPartido) + votacoesOrientacoes (idVotacao, siglaBancada, orientacao) — % de votos iguais à orientação da bancada do deputado; ? siglaBancada pode ser bloco, não partido: exige regra de casamento; "Liberado" e orientação nula ficam fora
 
@@ -28,6 +28,8 @@ despesas por competência; proposições conforme o arquivo do ano).
 10. Concentração de fornecedores — Ano-2025 (txtCNPJCPF só dígitos, txtFornecedor, vlrLiquido) — quantos fornecedores somam 80% do gasto (Pareto); CNPJ normalizado para não contar o mesmo fornecedor duas vezes
 
 11. Participação em votações nominais — votacoesVotos (idVotacao, deputado_id) + deputados (nome) — votos registrados sobre as 550 votações nominais do ano; mede voto, não presença (ver 1); ? suplentes ficam com taxa baixa por mandato curto
+12. Alinhamento ao Governo — votacoesVotos (idVotacao, deputado_id, voto) + votacoesOrientacoes (siglaBancada = 'Governo', orientacao) — % de votos iguais à orientação do Governo, por deputado; mesmas regras do 2; cobre os 20 partidos (o 2 só cobre 9)
+
 ## Indicadores que o dado NÃO sustenta
 
 - ❌ "Gasto por projeto aprovado" (eficiência do deputado) — a cota paga escritório, combustível
@@ -38,13 +40,15 @@ despesas por competência; proposições conforme o arquivo do ano).
   do ano (dicionário), não a da data da despesa.
 - ❌ "Taxa de faltas" — ausente não tem linha em votacoesVotos nem em eventosPresencaDeputados;
   só dá para contar presença e participação, não ausência (justificada ou não).
-  participação, não ausência justificada ou não.
 - ❌ "Como cada deputado votou na eleição do CNJ" — votação secreta (2576389-4):
   o voto individual é nulo por regra.
 
-  ## Próximos passos (fontes que destravariam mais indicadores)
+## Próximos passos (fontes que destravariam mais indicadores)
 
 - eventosOrgaos + orgaosDeputados (Câmara): taxa de presença com denominador real (membros de cada órgão)
 - IBGE, população por UF: gasto da cota per capita por estado
 - Receita Federal, base de CNPJ: data de abertura e atividade do fornecedor
 - TSE, prestação de contas: gasto de campanha × gasto de cota
+- Câmara, composição dos blocos parlamentares: fidelidade (2) para os 11 partidos que orientam pelo bloco
+
+Decisões de cada indicador (recorte, cortes de amostra, regras): ver docs/specs/03-marts.md.

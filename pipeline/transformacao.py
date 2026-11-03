@@ -19,6 +19,9 @@ sql/refined/<tabela>.sql). Resumo das regras e dos motivos:
   CREATE OR REPLACE TABLE refined.<tabela> AS <select> na ordem da spec
   (autoria depende de proposição; presença depende de evento), tudo numa
   transação só.
+- Adendo da spec 03: dados/de_para_bancada.csv (criado por nós) vira
+  refined.de_para_bancada, lido com as regras da ingestão (tudo texto), antes
+  das demais tabelas; 6 conferências próprias.
 - Antes de conectar: sem camara.duckdb, manda rodar a ingestão e sai
   (sem conectar(), que criaria o arquivo vazio). Banco travado (ui.py
   aberto): avisa e sai.
@@ -33,10 +36,14 @@ import sys
 from pathlib import Path
 
 import duckdb
+import pandas as pd
 
-from pipeline.db import CAMINHO_BANCO, conectar, criar_schema
+from pipeline.db import CAMINHO_BANCO, conectar, criar_schema, gravar
 
-PASTA_SQL = Path(__file__).resolve().parent.parent / "sql" / "refined"
+_RAIZ = Path(__file__).resolve().parent.parent
+PASTA_SQL = _RAIZ / "sql" / "refined"
+# Adendo da spec 03: de-para criado por nós (não é dado da Câmara), versionado.
+ARQUIVO_DE_PARA = _RAIZ / "dados" / "de_para_bancada.csv"
 SCHEMA = "refined"
 
 # Ordem da spec. (tabela refined, tabela raw de origem, colunas da chave)
@@ -147,8 +154,38 @@ def _conferencias() -> list[tuple[str, str, str]]:
          "SELECT count(*) FROM refined.presenca WHERE NOT bln_evento_cadastrado", "SELECT 2"),
         ("8. tema: proposições distintas = 19.754",
          "SELECT count(DISTINCT id_proposicao) FROM refined.tema", "SELECT 19754"),
+        # Adendo da spec 03: de-para partido -> bancada.
+        ("9. de_para_bancada: 27 linhas",
+         "SELECT count(*) FROM refined.de_para_bancada", "SELECT 27"),
+        ("9. de_para_bancada: (cod_partido, cod_bancada_origem) repetido",
+         ("SELECT count(*) FROM (SELECT cod_partido, cod_bancada_origem "
+          "FROM refined.de_para_bancada GROUP BY ALL HAVING count(*) > 1)"), "SELECT 0"),
+        ("9. de_para_bancada: 22 cod_bancada_origem distintos",
+         "SELECT count(DISTINCT cod_bancada_origem) FROM refined.de_para_bancada", "SELECT 22"),
+        ("9. de_para_bancada: cod_partido de voto sem de-para",
+         ("SELECT count(DISTINCT cod_partido) FROM refined.voto WHERE cod_partido NOT IN "
+          "(SELECT cod_partido FROM refined.de_para_bancada)"), "SELECT 0"),
+        ("9. de_para_bancada: colisões (id_votacao, cod_partido) no JOIN com orientacao",
+         ("SELECT count(*) - count(DISTINCT (o.id_votacao, d.cod_partido)) "
+          "FROM refined.orientacao o JOIN refined.de_para_bancada d "
+          "ON d.cod_bancada_origem = o.cod_bancada"), "SELECT 0"),
+        ("9. de_para_bancada: JOIN casa 3.283 orientações",
+         ("SELECT count(*) FROM refined.orientacao o JOIN refined.de_para_bancada d "
+          "ON d.cod_bancada_origem = o.cod_bancada"), "SELECT 3283"),
     ]  # fmt: skip
     return c
+
+
+def _ler_de_para() -> pd.DataFrame:
+    # Mesmas regras da ingestão (I4): tudo texto, UTF-8 declarado, só o vazio vira nulo.
+    return pd.read_csv(
+        ARQUIVO_DE_PARA,
+        sep=",",
+        encoding="utf-8-sig",
+        dtype=str,
+        keep_default_na=False,
+        na_values=[""],
+    )
 
 
 class FalhaTabela(Exception):
@@ -173,6 +210,13 @@ def transformar(
     """
     criar_schema(con, SCHEMA)
     contagens = {}
+    # O de-para vai primeiro: nada no refined depende dele, os marts sim.
+    try:
+        contagens["de_para_bancada"] = gravar(
+            con, _ler_de_para(), SCHEMA, "de_para_bancada"
+        )
+    except (OSError, ValueError, duckdb.Error) as e:
+        raise FalhaTabela("de_para_bancada", e) from e
     for tabela, _, _ in TABELAS:
         select = (
             (PASTA_SQL / f"{tabela}.sql")
@@ -211,6 +255,12 @@ def main() -> None:
         print(
             f"ERRO: {CAMINHO_BANCO} não existe.\n"
             'Rode a ingestão primeiro: "uv run python -m pipeline.ingestao".',
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if not ARQUIVO_DE_PARA.is_file():
+        print(
+            f"ERRO: {ARQUIVO_DE_PARA} não existe (é versionado no repositório).",
             file=sys.stderr,
         )
         sys.exit(1)
