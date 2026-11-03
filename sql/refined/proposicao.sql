@@ -1,0 +1,21 @@
+SELECT
+    CAST(id AS BIGINT)                          AS id_proposicao,
+    siglaTipo                                   AS cod_sigla_tipo,
+    CAST(codTipo AS INTEGER)                    AS cod_tipo,
+    descricaoTipo                               AS des_tipo,
+    CAST(numero AS INTEGER)                     AS num_proposicao,
+    CAST(ano AS INTEGER)                        AS num_ano,
+    ementa                                      AS des_ementa,
+    ementaDetalhada                             AS des_ementa_detalhada,
+    keywords                                    AS des_keywords,
+    CAST(dataApresentacao AS TIMESTAMP)         AS ts_apresentacao,
+    urlInteiroTeor                              AS des_url_inteiro_teor,
+    CAST(ultimoStatus_dataHora AS TIMESTAMP)    AS ts_ultimo_status,
+    CAST(ultimoStatus_idOrgao AS BIGINT)        AS id_orgao_ultimo_status,
+    ultimoStatus_siglaOrgao                     AS cod_orgao_ultimo_status,
+    ultimoStatus_regime                         AS des_regime,
+    ultimoStatus_descricaoTramitacao            AS des_tramitacao,
+    CAST(ultimoStatus_idSituacao AS INTEGER)    AS cod_situacao,
+    ultimoStatus_descricaoSituacao              AS des_situacao,
+    ultimoStatus_apreciacao                     AS des_apreciacao
+FROM raw.proposicoes

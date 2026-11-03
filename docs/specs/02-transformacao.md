@@ -20,20 +20,33 @@ Linha suspeita ganha flag (`bln_`), não é apagada. Quem filtra é o mart.
    (continuam na raw).
 6. **Id a partir de uri**: `CAST(split_part(uri, '/', -1) AS BIGINT)`. Nunca cortar por tamanho fixo.
 7. Booleanos vindos de `'1'`/`'0'`: `'1'` → TRUE, `'0'` → FALSE, NULL → NULL. Qualquer outro valor: falhar.
+   Não usar `CAST(x AS BOOLEAN)` (aceita 't', 'yes' etc.). Usar CASE pesquisado:
+   `CASE WHEN x IS NULL THEN NULL WHEN x = '1' THEN TRUE WHEN x = '0' THEN FALSE ELSE error('...') END`.
+   (`CASE x WHEN NULL` nunca casa: NULL = NULL não é verdadeiro.)
+8. Falso nulo: `NULLIF` antes do `CAST`, ex.: `CAST(NULLIF(ideDocumento, '0') AS BIGINT)`.
 
 ## Organização do código
 - `sql/refined/<tabela>.sql`: um arquivo por tabela, contendo só o `SELECT`.
 - `pipeline/transformacao.py`: lê cada arquivo, executa `CREATE OR REPLACE TABLE refined.<tabela> AS <select>`,
   tudo numa transação única, na ordem abaixo (autoria depende de proposição; presença depende de evento).
   Depois roda as conferências; se alguma falhar, desfaz tudo e mostra qual falhou.
+- Antes de conectar: se `camara.duckdb` não existir, avisar "rode a ingestão primeiro" e `sys.exit(1)`
+  (sem chamar `conectar()`, que criaria o arquivo vazio). Se o banco estiver travado (ui.py aberto), avisar e sair.
+- Se um `CAST` falhar: ROLLBACK, mostrar a tabela que falhou, `sys.exit(1)`.
 - Ordem: deputado, votacao, voto, orientacao, proposicao, autoria, tema, evento, presenca, despesa.
 
 ## Tabelas
 
 ### refined.deputado ← raw.deputados
-Grão: uma pessoa com mandato na legislatura atual (57). Chave: `id_deputado`.
-**Exceção à regra 1**: filtra `idLegislaturaFinal >= 57` (648 linhas). Decisão de escopo: o projeto
-analisa 2025, e o histórico desde 1826 não entra em nenhum indicador. A raw mantém os 7.889.
+Grão: um deputado relevante para o projeto. Chave: `id_deputado`.
+**Exceção à regra 1**: entra quem tem `idLegislaturaFinal >= 57` (648) **ou** aparece em algum fato
+(`votacoesVotos.deputado_id`, `eventosPresencaDeputados.idDeputado`, `proposicoesAutores.idDeputadoAutor`,
+`ceap.ideCadastro`). Regra de modelagem: a dimensão cobre todos os fatos, então nenhum JOIN perde linha.
+Fora da 57 há 9 deputados na presença (ex-deputados em eventos de 2025) e 33 na autoria (proposições antigas);
+pode haver sobreposição. Contagem esperada: **690** = 648 + 42 de fora da 57 (9 da presença + 33 da autoria,
+sem sobreposição; voto e despesa não acrescentam ninguém; nenhum id de fato ausente de `raw.deputados`).
+Medido na raw do retrato de 03/11/2026 15:49.
+Decisão de escopo: o histórico desde 1826 não entra em nenhum indicador. A raw mantém os 7.889.
 
 | origem | destino | tipo | regra |
 |---|---|---|---|
@@ -49,6 +62,7 @@ analisa 2025, e o histórico desde 1826 não entra em nenhum indicador. A raw ma
 | municipioNascimento | des_municipio_nascimento | VARCHAR | |
 | urlRedeSocial | des_url_rede_social | VARCHAR | |
 | urlWebsite | des_url_website | VARCHAR | |
+| (calculada) | bln_legislatura_atual | BOOLEAN | `idLegislaturaFinal >= 57`; TRUE esperado: 648. Marts de "deputados atuais" filtram por aqui |
 
 Sai: `cpf`.
 
@@ -250,18 +264,23 @@ Saem: `cpf`, `txtPassageiro` e o CPF de fornecedor pessoa física.
 Nenhum CPF chega ao refined. O hash usa as colunas da raw, mas md5 não devolve o valor original.
 
 ## Conferências (a carga só confirma se todas passarem)
-1. Contagem de cada tabela refined = contagem da raw de origem (exceto `deputado`: 648).
+Os números são fixos de propósito: valem para o retrato registrado no manifesto. Um retrato novo faz a carga
+falhar e obriga a revisar a spec (decisão consciente; projeto de retrato único).
+Cada verificação atômica conta 1. Rodar todas, listar todas as que falharam, ROLLBACK e `sys.exit(1)`.
+
+1. Contagem de cada tabela refined = contagem da raw de origem (exceto `deputado`: ver a regra da tabela).
 1b. Filtrar `deputado` não pode gerar órfão: todo `id_deputado` de `voto`, `presenca`, `autoria`
     e `despesa` (quando não NULL) existe em `refined.deputado`. Esperado: 0 órfãos em cada uma.
 2. Chave de cada tabela sem repetição e sem NULL.
 3. `votacao`: `id_proposicao` NULL = 7.219 · `bln_aprovada` NULL = 107 · `bln_orgao_teste` TRUE = 1.
 4. `voto`: `des_voto` NULL = 421, todos na votação `2576389-4`.
-5. `despesa`: `tp_beneficiario = 'lideranca'` = 937 = `cod_uf` NULL ·
-   `id_documento` NULL = 7.841 + os NULL que já existiam na raw ·
+5. `despesa`: `tp_beneficiario = 'lideranca'` = 937 ·
+   `id_documento` NULL = 7.842 (7.841 zeros + 1 NULL original) ·
    `sum(vlr_liquido)` = 240.347.478,45 · todo `cod_cnpj_fornecedor` não NULL tem 14 dígitos ·
-   `tp_fornecedor = 'PF'` ⇒ `cod_cnpj_fornecedor` NULL.
+   `tp_fornecedor = 'PF'` ⇒ `cod_cnpj_fornecedor` NULL ·
+   `cod_uf` NULL = 937 (verificação separada da de liderança).
 6. `autoria`: `bln_proposicao_cadastrada` FALSE = 56.
-7. `presenca`: `bln_evento_cadastrado` FALSE = número da ficha.
+7. `presenca`: `bln_evento_cadastrado` FALSE = 2.
 8. `tema`: `count(distinct id_proposicao)` = 19.754.
 
 Saída no terminal: uma linha por tabela (nome, linhas) e "Conferências: N de N OK".
@@ -269,4 +288,6 @@ Saída no terminal: uma linha por tabela (nome, linhas) e "Conferências: N de N
 ## Decisões registradas
 - CPF de fornecedor pessoa física não entra no refined (dado pessoal, repositório público).
   Consequência: no indicador 10 (concentração de fornecedores), pessoa física é agrupada por `des_fornecedor`.
-- `deputado` só com a legislatura 57 (ver exceção na tabela).
+- `deputado`: legislatura 57 + quem aparece em algum fato (opção A). Medido: só legislatura 57 deixava
+  9 deputados órfãos na presença e 33 na autoria. Descartadas a opção B (flag nos fatos, risco de JOIN errado
+  no mart) e a C (os 7.889, peso morto).
