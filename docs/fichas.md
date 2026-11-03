@@ -190,3 +190,48 @@
     → 10 votações nominais SEM orientação
 - Habilita o indicador: "o deputado seguiu a orientação da bancada?"
   (cuidado: siglaBancada pode ser bloco, não partido → casar com o partido do voto exige regra)
+
+### eventos
+- Fonte e data: dadosabertos.camara.leg.br/arquivos/eventos, baixado em 31/10/2026
+- Formato: utf-8 / separador `;` / cabeçalho na 1ª linha
+- Linhas: 3.225
+- Grão: um evento da Câmara (sessão, reunião de comissão, audiência)
+- Chave: id — provada (linhas = distintos)
+- Cópias exatas: nenhuma (decorre da chave única)
+- Liga com:
+  - eventosPresencaDeputados por id = idEvento (1:N); 2 presenças apontam para evento que não está aqui
+  - votacoes por id = idEvento
+- Categorias: situacao = Cancelada | Encerrada | Encerrada (Termo) | Encerrada (Final)
+  → evento realizado = situacao começa com "Encerrada"
+- Datas: dataHoraInicio / dataHoraFim
+- Perguntas em aberto: diferença entre Encerrada, (Termo) e (Final) — tratadas igual
+
+### eventosPresencaDeputados
+- Fonte e data: dadosabertos.camara.leg.br/arquivos/eventosPresencaDeputados, baixado em 31/10/2026
+- Formato: utf-8 / separador `;` / cabeçalho na 1ª linha
+- Linhas: 110.042
+- Grão: a presença de um deputado num evento
+- Chave: (idEvento, idDeputado) — provada
+- Cópias exatas: nenhuma (decorre da chave única)
+- Liga com:
+  - eventos por idEvento: 2 presenças sem evento cadastrado (flag no refined, não apaga)
+  - deputados por idDeputado: 567 deputados; 9 fora da legislatura 57 (ex-deputados em eventos de 2025,
+    provavelmente convidados de audiências)
+- Valores estranhos: 116 presenças em eventos não encerrados (cancelados)
+- Atenção: ausente não tem linha → dá para medir presença, não falta (taxa de faltas está em "não dá")
+
+### proposicoesTemas
+- Fonte e data: dadosabertos.camara.leg.br/arquivos/proposicoesTemas, baixado em 31/10/2026
+- Formato: utf-8 / separador `;` / cabeçalho na 1ª linha
+- Linhas: 40.909
+- Grão: um tema de uma proposição
+- Chave: (uriProposicao, codTema) — provada; id da proposição extraído da uri
+- Cópias exatas: nenhuma (decorre da chave única)
+- Liga com: proposicoes por id extraído de uriProposicao
+- Cobertura: 19.754 proposições com tema (18% das 107.587) → indicador por tema cobre só esse recorte
+- Categorias: 32 temas; até 12 temas por proposição; relevancia = 0 | 1 | 2
+- Atenção: proposição com vários temas conta uma vez em cada tema → a soma por tema é maior que o total de proposições
+
+### Correções nas fichas existentes
+- votacoesVotos, votacoes, deputados: "separador simples" → "separador `;`"
+- Ano-2025 (cota): remover "diferente dos outros"; "Cópias exatas: 0 (DISTINCT * = 209.081)"
