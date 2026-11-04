@@ -64,7 +64,7 @@ do código Python em `pipeline/`.
 |---|---|---|
 | O1 | `transformar(con)` com raw inventada | cria as 11 tabelas do refined e devolve as conferências; com dado inventado as conferências de número fixo falham e voltam como lista de mensagens, sem exceção |
 | O2 | `transformar(con)` com um booleano inválido | levanta `FalhaTabela` com o nome da tabela |
-| O3 | `construir(con)` depois do `transformar` | cria os 13 marts |
+| O3 | `construir(con)` depois do `transformar` | cria os 15 marts (13 da spec 03 + `agg_Proposicao_Tema` e `agg_Resumo` da spec 05) |
 | O4 | `marts.conferir_lista()` | devolve lista vazia para o repositório como está |
 | O5 | `db.criar_schema` e `db.gravar` | grava um DataFrame e devolve o número de linhas |
 | O6 | `ingestao._ler` com um CSV inventado em `tmp_path` | `'NA'` continua `'NA'` (é o `keep_default_na=False`) e campo vazio vira NULL |

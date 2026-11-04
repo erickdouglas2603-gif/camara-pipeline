@@ -303,3 +303,83 @@ def test_participacao_deputado_janela(con):
     # ASSERT
     assert por_id[4002] == (2, 2)  # muda: só P3 e P4 (da posse em diante); C1 não entra
     assert por_id[4001] == (4, 4)  # não muda: o titular tem o ano inteiro de Plenário
+
+
+def test_proposicao_tema_grupos_somam_o_tema(con):
+    # ARRANGE: um deputado do universo propõe 1 PL, 1 RIC e 1 PEC (vai para Outros), todos no tema 40;
+    # a PEC também tem o tema 41. Um segundo proponente na PL não pode contá-la duas vezes.
+    _deputados(con, {"5001": "57", "5002": "57"})
+    inserir(
+        con, "ceap", [{"ideCadastro": i} for i in ["5001", "5002"]]
+    )  # fato em 2025 -> universo
+    inserir(
+        con,
+        "proposicoes",
+        [
+            {"id": "1", "siglaTipo": "PL", "ano": "2025"},
+            {"id": "2", "siglaTipo": "RIC", "ano": "2025"},
+            {"id": "3", "siglaTipo": "PEC", "ano": "2025"},
+        ],
+    )
+    proponente = {"proponente": "1"}
+    inserir(
+        con,
+        "proposicoesAutores",
+        [
+            proponente
+            | {"idProposicao": "1", "idDeputadoAutor": "5001", "ordemAssinatura": "1"},
+            proponente
+            | {"idProposicao": "1", "idDeputadoAutor": "5002", "ordemAssinatura": "2"},
+            proponente
+            | {"idProposicao": "2", "idDeputadoAutor": "5001", "ordemAssinatura": "1"},
+            proponente
+            | {"idProposicao": "3", "idDeputadoAutor": "5001", "ordemAssinatura": "1"},
+        ],
+    )
+    uri = "https://dadosabertos.camara.leg.br/api/v2/proposicoes/"
+    inserir(
+        con,
+        "proposicoesTemas",
+        [
+            {"uriProposicao": uri + "1", "codTema": "40", "tema": "Saúde"},
+            {"uriProposicao": uri + "2", "codTema": "40", "tema": "Saúde"},
+            {"uriProposicao": uri + "3", "codTema": "40", "tema": "Saúde"},
+            {"uriProposicao": uri + "3", "codTema": "41", "tema": "Educação"},
+        ],
+    )
+    montar_refined(con)
+    rodar(con, "marts", "dim_Deputado")
+
+    # ACT
+    rodar(con, "marts", "agg_Proposicao_Tema")
+    linhas = con.execute(
+        "SELECT cod_tema, cod_tipo_grupo, qtd_proposicoes, qtd_proposicoes_tema, qtd_deputados "
+        "FROM marts.agg_Proposicao_Tema ORDER BY cod_tema, cod_tipo_grupo"
+    ).fetchall()
+
+    # ASSERT
+    assert linhas == [
+        (40, "Outros", 1, 3, 1),  # PEC classificada em Outros
+        (40, "PL", 1, 3, 2),  # a PL de 2 proponentes conta 1 vez
+        (40, "RIC", 1, 3, 1),
+        (41, "Outros", 1, 1, 1),  # a mesma PEC conta também no outro tema
+    ]
+
+
+def test_votacao_apertada_flag_plenario(con):
+    # ARRANGE
+    _votacoes(
+        con, [{"id": "P", "siglaOrgao": "PLEN"}, {"id": "C", "siglaOrgao": "CCJC"}]
+    )
+    montar_refined(con)
+
+    # ACT
+    rodar(con, "marts", "agg_Votacao_Apertada")
+    por_id = dict(
+        con.execute(
+            "SELECT id_votacao, bln_plenario FROM marts.agg_Votacao_Apertada"
+        ).fetchall()
+    )
+
+    # ASSERT
+    assert por_id == {"P": True, "C": False}

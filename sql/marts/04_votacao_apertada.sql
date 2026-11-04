@@ -1,6 +1,7 @@
 -- grão: uma votação nominal (550): placar > 0 e fora o órgão de teste
 -- Todos os órgãos entram; a margem é proporcional (numa comissão de 10 votos só o empate é apertado).
 -- Corte de 5% sobre o pct_margem arredondado (o que o leitor vê).
+-- bln_plenario: o dashboard separa Plenário e comissões por esta flag, sem classificar no Python.
 -- bln_resultado_contra_placar: aprovada com mais Não, ou rejeitada com mais Sim. Empate é FALSE
 -- (quem decide é o desempate). CASE explícito porque, com bln_aprovada NULL, a expressão sozinha
 -- daria FALSE (NULL AND FALSE = FALSE) em vez de NULL.
@@ -23,6 +24,7 @@ SELECT
     bln_aprovada,
     pct_margem,
     pct_margem < 5 AS bln_apertada,
+    cod_orgao = 'PLEN' AS bln_plenario,
     CASE
         WHEN bln_aprovada IS NULL THEN NULL
         ELSE (bln_aprovada AND qtd_votos_nao > qtd_votos_sim)

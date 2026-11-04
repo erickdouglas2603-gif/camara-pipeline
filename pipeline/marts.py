@@ -49,6 +49,8 @@ MARTS = [
         "agg_Proposicao_Tema_Deputado",
         ["id_deputado", "cod_tema", "cod_sigla_tipo"],
     ),
+    # Adendo da spec 05: o gráfico 5 precisa da contagem por tema sem repetir proposição.
+    ("05b_proposicao_tema.sql", "agg_Proposicao_Tema", ["cod_tema", "cod_tipo_grupo"]),
     ("06_gasto_deputado.sql", "agg_Gasto_Deputado", ["id_deputado"]),
     ("07_gasto_categoria.sql", "agg_Gasto_Categoria", ["cod_subcota"]),
     ("08_gasto_mensal.sql", "agg_Gasto_Mensal", ["data_competencia"]),
@@ -56,6 +58,8 @@ MARTS = [
     ("10_fornecedor_pareto.sql", "agg_Fornecedor_Pareto", ["cod_fornecedor"]),
     ("11_participacao_deputado.sql", "agg_Participacao_Deputado", ["id_deputado"]),
     ("12_alinhamento_governo.sql", "agg_Alinhamento_Governo", ["id_deputado"]),
+    # Adendo da spec 05: uma linha só, sem chave (conferência "exatamente 1 linha").
+    ("13_resumo.sql", "agg_Resumo", []),
 ]
 
 UNIVERSO_2025 = 564
@@ -88,11 +92,21 @@ def conferir_lista() -> list[str]:
         problemas.append(f"{arquivo} está em sql/marts/ mas não na lista MARTS")
     for arquivo in sorted(set(na_lista) - set(no_disco)):
         problemas.append(f"{arquivo} está na lista MARTS mas não em sql/marts/")
-    # Ordem numérica pelo prefixo <nn>_, não alfabética (00 < 01 < ... < 10 < 11).
-    numeros = [int(arquivo.split("_", 1)[0]) for arquivo in na_lista]
-    if numeros != sorted(numeros):
-        problemas.append(f"a lista MARTS não segue a numeração dos arquivos: {numeros}")
+    # Ordem numérica pelo prefixo <nn>[sufixo]_, não alfabética: 00 < 01 < ... < 05 < 05b < 06 < 10.
+    ordem = [_ordem(arquivo) for arquivo in na_lista]
+    if ordem != sorted(ordem):
+        prefixos = [arquivo.split("_", 1)[0] for arquivo in na_lista]
+        problemas.append(
+            f"a lista MARTS não segue a numeração dos arquivos: {prefixos}"
+        )
     return problemas
+
+
+def _ordem(arquivo: str) -> tuple[int, str]:
+    """'05b_proposicao_tema.sql' -> (5, 'b'): número primeiro, sufixo de letra depois."""
+    prefixo = arquivo.split("_", 1)[0]
+    digitos = prefixo.rstrip("abcdefghijklmnopqrstuvwxyz")
+    return int(digitos), prefixo[len(digitos) :]
 
 
 def _dec(valor: str) -> str:
@@ -102,8 +116,17 @@ def _dec(valor: str) -> str:
 def _conferencias() -> list[tuple[str, str, str]]:
     """(descrição, SQL do valor obtido, SQL do valor esperado). Cada uma conta 1."""
     c = []
-    # 1. Chave (o grão) sem repetição e sem NULL.
+    # 1. Chave (o grão) sem repetição e sem NULL. Mart sem chave (uma linha): exatamente 1 linha.
     for _, tabela, chave in MARTS:
+        if not chave:
+            c.append(
+                (
+                    f"1. {tabela}: exatamente 1 linha",
+                    f"SELECT count(*) FROM marts.{tabela}",
+                    "SELECT 1",
+                )
+            )
+            continue
         cols = ", ".join(chave)
         algum_nulo = " OR ".join(f"{k} IS NULL" for k in chave)
         c.append(
@@ -129,6 +152,7 @@ def _conferencias() -> list[tuple[str, str, str]]:
         ("agg_Fidelidade_Partido", 20),
         ("agg_Votacao_Apertada", 550),
         ("agg_Proposicao_Tema_Deputado", 15223),
+        ("agg_Proposicao_Tema", 122),
         ("agg_Gasto_Categoria", 21),
         ("agg_Gasto_Mensal", 12),
         ("agg_Gasto_UF", 27),
@@ -175,6 +199,13 @@ def _conferencias() -> list[tuple[str, str, str]]:
          "SELECT 4"),
         ("6. agg_Votacao_Apertada: bln_apertada TRUE = 7",
          "SELECT count(*) FROM marts.agg_Votacao_Apertada WHERE bln_apertada", "SELECT 7"),
+        ("6. agg_Votacao_Apertada: bln_plenario TRUE = 429",
+         "SELECT count(*) FROM marts.agg_Votacao_Apertada WHERE bln_plenario", "SELECT 429"),
+        # Spec 05: as barras dos grupos de um tema somam o total do tema.
+        ("5b. agg_Proposicao_Tema: temas com soma dos grupos <> qtd_proposicoes_tema",
+         ("SELECT count(*) FROM (SELECT cod_tema FROM marts.agg_Proposicao_Tema GROUP BY cod_tema "
+          "HAVING sum(qtd_proposicoes) <> any_value(qtd_proposicoes_tema) "
+          "OR count(DISTINCT qtd_proposicoes_tema) > 1)"), "SELECT 0"),
         # 7. M07.
         ("7. agg_Gasto_Categoria: sum(pct_total) entre 99,9 e 100,1",
          "SELECT sum(pct_total) BETWEEN 99.9 AND 100.1 FROM marts.agg_Gasto_Categoria",
@@ -215,6 +246,19 @@ def _conferencias() -> list[tuple[str, str, str]]:
          "SELECT sum(qtd_votos_orientados) FROM marts.agg_Alinhamento_Governo", "SELECT 129694"),
         ("11. agg_Alinhamento_Governo: sum(qtd_votos_alinhados) = 86.259",
          "SELECT sum(qtd_votos_alinhados) FROM marts.agg_Alinhamento_Governo", "SELECT 86259"),
+        # 12. agg_Resumo (adendo da spec 05): os números dos cartões de destaque.
+        ("12. agg_Resumo: vlr_total_cota = 240.347.478,45",
+         "SELECT vlr_total_cota FROM marts.agg_Resumo", _dec(TOTAL_COTA)),
+        ("12. agg_Resumo: qtd_deputados = 564",
+         "SELECT qtd_deputados FROM marts.agg_Resumo", f"SELECT {UNIVERSO_2025}"),
+        ("12. agg_Resumo: qtd_votacoes_nominais = 550",
+         "SELECT qtd_votacoes_nominais FROM marts.agg_Resumo", "SELECT 550"),
+        ("12. agg_Resumo: qtd_votacoes_apertadas = 7",
+         "SELECT qtd_votacoes_apertadas FROM marts.agg_Resumo", "SELECT 7"),
+        ("12. agg_Resumo: qtd_fornecedores = 19.663",
+         "SELECT qtd_fornecedores FROM marts.agg_Resumo", "SELECT 19663"),
+        ("12. agg_Resumo: qtd_fornecedores_top80 = 1.452",
+         "SELECT qtd_fornecedores_top80 FROM marts.agg_Resumo", "SELECT 1452"),
     ]  # fmt: skip
     return c
 

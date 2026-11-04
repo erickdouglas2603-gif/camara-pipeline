@@ -124,6 +124,7 @@ Grão: uma votação nominal (550): placar `qtd_votos_sim + qtd_votos_nao + qtd_
 | id_votacao, data_votacao, cod_orgao, qtd_votos_sim, qtd_votos_nao, qtd_votos_outros, bln_aprovada | do refined |
 | pct_margem | `abs(sim − não) / (sim + não)`; NULL se sim + não = 0 |
 | bln_apertada | `pct_margem < 5` |
+| bln_plenario | `cod_orgao = 'PLEN'` (adendo da spec 05: o dashboard separa Plenário e comissões pela flag, sem classificar no Python) |
 | bln_resultado_contra_placar | `(bln_aprovada AND não > sim) OR (NOT bln_aprovada AND sim > não)`; NULL se `bln_aprovada` é NULL; empate é FALSE (quem decide é o desempate) |
 
 - Todos os órgãos entram. A margem é proporcional, então numa comissão de 10 votos só o empate é apertado.
@@ -267,7 +268,7 @@ Mesmo padrão da spec 02: números fixos do retrato, cada verificação atômica
 4. M02: `sum(qtd_votos)` = 175.067 · `sum(qtd_votos_orientados)` = 32.179 · `sum(qtd_votos_fieis)` = 30.770 ·
    `bln_amostra_suficiente` TRUE = 9.
 5. M03: soma de `qtd_votacoes` = 8.212 (grupos com 3 ou mais deputados).
-6. M04: `bln_resultado_contra_placar` TRUE = 4 · `bln_apertada` TRUE = 7.
+6. M04: `bln_resultado_contra_placar` TRUE = 4 · `bln_apertada` TRUE = 7 · `bln_plenario` TRUE = 429.
 7. M07: `sum(pct_total)` entre 99,9 e 100,1 (arredondamento).
 8. M10: último `pct_acumulado` = 100,0 · `bln_cnpj_ficticio` TRUE = 5 chaves · `bln_top_80` TRUE = 1.452.
 9. M11: `pct_participacao` entre 0 e 100 · `qtd_votos_registrados <= qtd_votacoes_no_periodo`.

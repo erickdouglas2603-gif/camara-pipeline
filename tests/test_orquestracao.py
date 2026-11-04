@@ -46,7 +46,7 @@ def test_transformar_booleano_invalido_levanta_falha_tabela(con):
     assert erro.value.tabela == "votacao"
 
 
-def test_construir_cria_os_13_marts(con):
+def test_construir_cria_os_15_marts(con):
     # ARRANGE
     montar_refined(con)
 
@@ -57,9 +57,9 @@ def test_construir_cria_os_13_marts(con):
     ).fetchall()[0][0]
 
     # ASSERT
-    assert tabelas == 13
+    assert tabelas == 15
     assert list(contagens) == [t for _, t, _ in marts.MARTS]
-    assert total == 64
+    assert total == 76
     assert falhas and all(isinstance(f, str) for f in falhas)  # sem exceção, como lista
 
 
