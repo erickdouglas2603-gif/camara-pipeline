@@ -36,7 +36,7 @@ docs/relatorio.html
 | Origem | [Portal de Dados Abertos da Câmara dos Deputados](https://dadosabertos.camara.leg.br) e arquivo da cota parlamentar (`camara.leg.br/cotas`) |
 | Recorte | ano de 2025 |
 | Retrato | baixado em 03/11/2026 (data e sha256 de cada arquivo em `raw/_manifesto.json`) |
-| Licença | dados públicos do Poder Legislativo <!-- TODO: confirmar no portal o texto exato da licença ou dos termos de uso --> |
+| Licença | Dados públicos, divulgados pela Câmara dos Deputados no Portal de Dados Abertos para livre consulta. O portal não informa uma licença específica (verificado em 04/11/2026). |
 | Tabelas | votações, votos, orientações, deputados, proposições, autores, temas, eventos, presenças e despesas da cota |
 
 Ligações usadas (mais de duas tabelas relacionadas por chave): voto → votação → orientação; voto, despesa,
