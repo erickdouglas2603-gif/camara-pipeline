@@ -5,7 +5,7 @@ e entrega 12 indicadores sobre votações, atividade parlamentar e cota parlamen
 
 **[Abrir o dashboard](https://erickdouglas2603-gif.github.io/camara-pipeline/docs/relatorio.html)**
 
-Projeto final da Aula 4 da Formação em Engenharia de Dados (Indicium).
+Projeto final da Aula 4 da Formação em Engenharia de Dados.
 
 ## Arquitetura
 
