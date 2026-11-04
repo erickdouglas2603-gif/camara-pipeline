@@ -221,7 +221,10 @@ def _conferencias() -> list[tuple[str, str, str]]:
 
 def _valor(con: duckdb.DuckDBPyConnection, sql: str):
     # fetchall: o DuckDB 2 bloqueia a conexão com resultado não esgotado.
-    return con.execute(sql).fetchall()[0][0]
+    linhas = con.execute(sql).fetchall()
+    # Consulta sem linha (ex.: "último pct_acumulado" num mart vazio) vale NULL e vira
+    # conferência falha na lista, não exceção.
+    return linhas[0][0] if linhas else None
 
 
 def construir(

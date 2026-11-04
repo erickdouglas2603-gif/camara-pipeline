@@ -11,5 +11,11 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
     "ruff>=0.17.3",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Cobertura medida e cobrada em toda execução (spec 04). Teste isolado: --no-cov.
+addopts = "--cov=pipeline --cov-report=term-missing --cov-fail-under=60"
